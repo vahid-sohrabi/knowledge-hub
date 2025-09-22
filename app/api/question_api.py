@@ -1,27 +1,31 @@
-# app/api/controllers/question_api.py
-from fastapi import APIRouter, Query
-from typing import Optional
-from app.services.pipeline.rag_pipeline import RAGPipeline
-from app.models.api.api_response import ApiResponse
+from fastapi import APIRouter
+from app.models.api.question.question_request import QuestionRequest
+from app.models.api.question.question_response import QuestionResponse, AnswerItem
 
 
 class QuestionAPI:
     """
-    API class for asking questions to RAG pipeline.
+    API class for asking questions to a RAG pipeline.
     """
 
-    def __init__(self, pipeline: RAGPipeline):
+    def __init__(self, pipeline):
         self.pipeline = pipeline
         self.router = APIRouter(prefix="/rag/query", tags=["RAG QA"])
-        self.router.add_api_route("/", self.ask_question, methods=["GET"])
+        self.router.add_api_route("/", self.ask_question, methods=["POST"])
 
-    async def ask_question(
-        self,
-        question: str = Query(..., description="User question"),
-        top_k: Optional[int] = Query(None, description="Number of top results to retrieve")
-    ):
-        # Get answer from RAG pipeline
-        answer = self.pipeline.answer(query=question, top_k=top_k)
+    async def ask_question(self, request: QuestionRequest) -> QuestionResponse:
+        answers = self.pipeline.answer(query=request.question, top_k=request.top_k)
 
-        # Return standard ApiResponse
-        return ApiResponse.ok(data={"question": question, "answer": answer, "top_k": top_k})
+        if isinstance(answers, str):
+            answers = [AnswerItem(answer=answers)]
+        elif isinstance(answers, list):
+            answers = [
+                AnswerItem(answer=a) if isinstance(a, str) else AnswerItem(**a)
+                for a in answers
+            ]
+
+        return QuestionResponse(
+            question=request.question,
+            top_k=request.top_k,
+            answers=answers
+        )

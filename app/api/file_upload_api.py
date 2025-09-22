@@ -1,33 +1,36 @@
-# app/api/controllers/file_upload_api.py
-from fastapi import APIRouter, UploadFile, File
-from typing import Optional
-import os
+from fastapi import APIRouter, Depends
 from app.services.pipeline.rag_pipeline import RAGPipeline
-from app.models.api.api_response import ApiResponse
+from app.models.api.upload.file_upload_request import FileUploadRequest
+from app.models.api.upload.file_upload_response import FileUploadResponse
+from app.utils.file.file_handler import FileHandler
 
 
 class FileUploadAPI:
     """
-    API class for uploading files and ingesting into RAG pipeline.
+    API router for handling file uploads to the RAG pipeline.
+    Uses FileHandler utility for file operations.
     """
-    def __init__(self, pipeline: RAGPipeline):
+    def __init__(self, pipeline: RAGPipeline, file_handler: FileHandler = None):
         self.pipeline = pipeline
+        self.file_handler = file_handler or FileHandler()
         self.router = APIRouter(prefix="/rag/upload", tags=["RAG Upload"])
         self.router.add_api_route("/", self.upload_file, methods=["POST"])
 
-    async def upload_file(self, file: UploadFile = File(...), doc_id: Optional[str] = None):
-        doc_id = doc_id or file.filename
-        temp_path = f"temp_{file.filename}"
+    async def upload_file(
+        self,
+        request: FileUploadRequest = Depends()
+    ) -> FileUploadResponse:
+        doc_id = request.metadata.doc_id
 
-        # Save file temporarily
-        with open(temp_path, "wb") as f:
-            f.write(await file.read())
+        # Delegate to FileHandler util
+        temp_path = await self.file_handler.save_temp(request.file)
 
         try:
             self.pipeline.ingest_file(file_path=temp_path, doc_id=doc_id)
         finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+            self.file_handler.delete(temp_path)
 
-        # Use ApiResponse for standard response
-        return ApiResponse.ok(data={"filename": file.filename, "doc_id": doc_id})
+        return FileUploadResponse(
+            filename=request.file.filename,
+            doc_id=doc_id
+        )

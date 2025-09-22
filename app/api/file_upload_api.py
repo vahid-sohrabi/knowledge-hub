@@ -3,13 +3,13 @@ from fastapi import APIRouter, UploadFile, File
 from typing import Optional
 import os
 from app.services.pipeline.rag_pipeline import RAGPipeline
+from app.models.api.api_response import ApiResponse
 
 
 class FileUploadAPI:
     """
     API class for uploading files and ingesting into RAG pipeline.
     """
-
     def __init__(self, pipeline: RAGPipeline):
         self.pipeline = pipeline
         self.router = APIRouter(prefix="/rag/upload", tags=["RAG Upload"])
@@ -29,4 +29,5 @@ class FileUploadAPI:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
-        return {"message": f"File '{file.filename}' uploaded and processed successfully."}
+        # Use ApiResponse for standard response
+        return ApiResponse.ok(data={"filename": file.filename, "doc_id": doc_id})

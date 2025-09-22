@@ -2,6 +2,8 @@
 from fastapi import FastAPI
 from app.api.file_upload_api import FileUploadAPI
 from app.api.question_api import QuestionAPI
+from app.exception.api_exception import ApiException
+from app.exception.handler.general_error_handler import GeneralErrorHandler
 from app.services.pipeline.rag_pipeline import RAGPipeline
 from app.services.loader.registry.file_registry import FileTypeRegistry
 from app.services.loader.registry.file_type import FileType
@@ -22,6 +24,10 @@ FileTypeRegistry.register(FileType.XLSX, lambda path: ExcelLoader(path))
 
 # --- Initialize RAG pipeline ---
 rag_pipeline = RAGPipeline()
+
+# --- Register central error handler ---
+error_handler = GeneralErrorHandler()
+app.add_exception_handler(ApiException, error_handler.handle_exception)
 
 # --- Initialize API classes and include routers ---
 upload_api = FileUploadAPI(pipeline=rag_pipeline)
